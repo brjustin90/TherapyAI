@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Therapy Sessions - Mental Health AI Therapy{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1 class="mb-3">Your Therapy Sessions</h1>
+        <p class="lead">View and manage all your therapy sessions.</p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <a href="{{ url_for('new_session') }}" class="btn btn-primary">
+            <i class="fas fa-plus-circle me-2"></i>Schedule New Session
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <ul class="nav nav-tabs mb-4" id="sessionTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="upcoming-tab" data-bs-toggle="tab" data-bs-target="#upcoming" type="button" role="tab">Upcoming</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="past-tab" data-bs-toggle="tab" data-bs-target="#past" type="button" role="tab">Past</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">All</button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="sessionTabsContent">
+            <!-- Upcoming Sessions Tab -->
+            <div class="tab-pane fade show active" id="upcoming" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set has_upcoming = false %}
+                            {% for session in sessions %}
+                                {% if session.scheduled_start > now and session.status != 'CANCELLED' %}
+                                    {% set has_upcoming = true %}
+                                    <tr>
+                                        <td>{{ session.title }}</td>
+                                        <td>{{ session.session_type }}</td>
+                                        <td>{{ session.scheduled_start.strftime('%b %d, %Y') }}</td>
+                                        <td>{{ session.scheduled_start.strftime('%I:%M %p') }}</td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ session.status }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ url_for('view_session', session_id=session.id) }}" class="btn btn-outline-primary">View</a>
+                                                {% if session.status == 'SCHEDULED' %}
+                                                    <a href="{{ url_for('session_chat', session_id=session.id) }}" class="btn btn-success">Start</a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if not has_upcoming %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">No upcoming sessions. <a href="{{ url_for('new_session') }}">Schedule one now</a>.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Past Sessions Tab -->
+            <div class="tab-pane fade" id="past" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set has_past = false %}
+                            {% for session in sessions %}
+                                {% if session.scheduled_start <= now or session.status == 'COMPLETED' %}
+                                    {% set has_past = true %}
+                                    <tr>
+                                        <td>{{ session.title }}</td>
+                                        <td>{{ session.session_type }}</td>
+                                        <td>{{ session.scheduled_start.strftime('%b %d, %Y') }}</td>
+                                        <td>{{ session.scheduled_start.strftime('%I:%M %p') }}</td>
+                                        <td>
+                                            {% if session.status == 'COMPLETED' %}
+                                                <span class="badge bg-success">{{ session.status }}</span>
+                                            {% elif session.status == 'CANCELLED' %}
+                                                <span class="badge bg-danger">{{ session.status }}</span>
+                                            {% elif session.status == 'MISSED' %}
+                                                <span class="badge bg-warning">{{ session.status }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ session.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('view_session', session_id=session.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if not has_past %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">No past sessions yet.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- All Sessions Tab -->
+            <div class="tab-pane fade" id="all" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if sessions %}
+                                {% for session in sessions %}
+                                    <tr>
+                                        <td>{{ session.title }}</td>
+                                        <td>{{ session.session_type }}</td>
+                                        <td>{{ session.scheduled_start.strftime('%b %d, %Y') }}</td>
+                                        <td>{{ session.scheduled_start.strftime('%I:%M %p') }}</td>
+                                        <td>
+                                            {% if session.status == 'SCHEDULED' %}
+                                                <span class="badge bg-primary">{{ session.status }}</span>
+                                            {% elif session.status == 'IN_PROGRESS' %}
+                                                <span class="badge bg-info">{{ session.status }}</span>
+                                            {% elif session.status == 'COMPLETED' %}
+                                                <span class="badge bg-success">{{ session.status }}</span>
+                                            {% elif session.status == 'CANCELLED' %}
+                                                <span class="badge bg-danger">{{ session.status }}</span>
+                                            {% elif session.status == 'MISSED' %}
+                                                <span class="badge bg-warning">{{ session.status }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ session.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ url_for('view_session', session_id=session.id) }}" class="btn btn-outline-primary">View</a>
+                                                {% if session.status == 'SCHEDULED' %}
+                                                    <a href="{{ url_for('session_chat', session_id=session.id) }}" class="btn btn-success">Start</a>
+                                                {% elif session.status == 'IN_PROGRESS' %}
+                                                    <a href="{{ url_for('session_chat', session_id=session.id) }}" class="btn btn-info">Continue</a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">No sessions found. <a href="{{ url_for('new_session') }}">Schedule one now</a>.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Set the current date for template use
+    document.currentDate = new Date();
+</script>
+{% endblock %} 

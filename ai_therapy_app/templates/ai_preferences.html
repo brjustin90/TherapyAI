@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}AI Learning Preferences - Mental Health AI Therapy{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-3">AI Learning Preferences</h1>
+            <p class="lead">Control how our AI learns about you to provide personalized therapy.</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <a href="{{ url_for('profile') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Profile
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title mb-0">AI Learning Consent</h3>
+                </div>
+                <div class="card-body">
+                    <form id="consent-form" method="POST" action="{{ url_for('update_ai_preferences') }}">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="data_collection_consent" name="data_collection_consent" {% if user_profile and user_profile.data_collection_consent %}checked{% endif %}>
+                            <label class="form-check-label fw-bold" for="data_collection_consent">Allow AI to learn from our interactions</label>
+                        </div>
+                        
+                        <p>When enabled, our AI can learn from your interactions to provide more personalized support. This helps the AI understand your preferences, communication style, and therapy needs over time.</p>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>You can change this setting at any time. If disabled, the AI will use only information from the current session.
+                        </div>
+                        
+                        <h4 class="mt-4 mb-3">Data Retention</h4>
+                        <div class="mb-3">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="data_retention_preference" id="retention_session" value="session" {% if not user_profile or user_profile.data_retention_preference == "session" %}checked{% endif %}>
+                                <label class="form-check-label" for="retention_session">
+                                    <strong>Session Only</strong> - Data is deleted at the end of each session
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="data_retention_preference" id="retention_limited" value="limited" {% if user_profile and user_profile.data_retention_preference == "limited" %}checked{% endif %}>
+                                <label class="form-check-label" for="retention_limited">
+                                    <strong>Limited Retention</strong> - Data is stored for 30 days to improve your experience
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="data_retention_preference" id="retention_permanent" value="permanent" {% if user_profile and user_profile.data_retention_preference == "permanent" %}checked{% endif %}>
+                                <label class="form-check-label" for="retention_permanent">
+                                    <strong>Permanent Retention</strong> - Data is stored indefinitely for continuous improvement
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <h4 class="mt-4 mb-3">Data Sharing</h4>
+                        <div class="mb-3">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="share_anonymized_research" name="share_anonymized_research" {% if user_profile and user_profile.data_sharing_permissions.anonymized_research %}checked{% endif %}>
+                                <label class="form-check-label" for="share_anonymized_research">
+                                    <strong>Anonymized Research</strong> - Share anonymized data to improve mental health research
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="share_therapist_oversight" name="share_therapist_oversight" {% if user_profile and user_profile.data_sharing_permissions.therapist_oversight %}checked{% endif %}>
+                                <label class="form-check-label" for="share_therapist_oversight">
+                                    <strong>Therapist Oversight</strong> - Allow human therapists to review sessions for quality assurance
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save Preferences
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h3 class="card-title mb-0">Personalization Settings</h3>
+                </div>
+                <div class="card-body">
+                    <form id="personalization-form" method="POST" action="{{ url_for('update_ai_personalization') }}">
+                        <h4 class="mb-3">Communication Style</h4>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="formality_level" class="form-label">Formality Level</label>
+                                <select class="form-select" id="formality_level" name="formality_level">
+                                    <option value="casual" {% if user_profile and user_profile.communication_style.formality_level == "casual" %}selected{% endif %}>Casual and Friendly</option>
+                                    <option value="balanced" {% if not user_profile or not user_profile.communication_style.formality_level or user_profile.communication_style.formality_level == "balanced" %}selected{% endif %}>Balanced</option>
+                                    <option value="formal" {% if user_profile and user_profile.communication_style.formality_level == "formal" %}selected{% endif %}>Professional and Formal</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="verbosity" class="form-label">Response Length</label>
+                                <select class="form-select" id="verbosity" name="verbosity">
+                                    <option value="concise" {% if user_profile and user_profile.communication_style.verbosity == "concise" %}selected{% endif %}>Brief and Concise</option>
+                                    <option value="balanced" {% if not user_profile or not user_profile.communication_style.verbosity or user_profile.communication_style.verbosity == "balanced" %}selected{% endif %}>Balanced</option>
+                                    <option value="detailed" {% if user_profile and user_profile.communication_style.verbosity == "detailed" %}selected{% endif %}>Detailed and Thorough</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <h4 class="mb-3">Therapy Approach Preferences</h4>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Rate each approach (1-10):</label>
+                                    
+                                    <div class="mb-2">
+                                        <label for="cbt_rating" class="form-label">Cognitive Behavioral Therapy (CBT)</label>
+                                        <input type="range" class="form-range" min="1" max="10" step="1" id="cbt_rating" name="therapy_approaches[cbt]" value="{{ user_profile.therapy_approaches.cbt|default(5) if user_profile else 5 }}">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="small">1</span>
+                                            <span class="small text-center" id="cbt_value">{{ user_profile.therapy_approaches.cbt|default(5) if user_profile else 5 }}</span>
+                                            <span class="small">10</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-2">
+                                        <label for="mindfulness_rating" class="form-label">Mindfulness-Based Therapy</label>
+                                        <input type="range" class="form-range" min="1" max="10" step="1" id="mindfulness_rating" name="therapy_approaches[mindfulness]" value="{{ user_profile.therapy_approaches.mindfulness|default(5) if user_profile else 5 }}">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="small">1</span>
+                                            <span class="small text-center" id="mindfulness_value">{{ user_profile.therapy_approaches.mindfulness|default(5) if user_profile else 5 }}</span>
+                                            <span class="small">10</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-2">
+                                        <label for="psychodynamic_rating" class="form-label">Psychodynamic Approach</label>
+                                        <input type="range" class="form-range" min="1" max="10" step="1" id="psychodynamic_rating" name="therapy_approaches[psychodynamic]" value="{{ user_profile.therapy_approaches.psychodynamic|default(5) if user_profile else 5 }}">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="small">1</span>
+                                            <span class="small text-center" id="psychodynamic_value">{{ user_profile.therapy_approaches.psychodynamic|default(5) if user_profile else 5 }}</span>
+                                            <span class="small">10</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="solution_focused_rating" class="form-label">Solution-Focused Therapy</label>
+                                    <input type="range" class="form-range" min="1" max="10" step="1" id="solution_focused_rating" name="therapy_approaches[solution_focused]" value="{{ user_profile.therapy_approaches.solution_focused|default(5) if user_profile else 5 }}">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="small">1</span>
+                                        <span class="small text-center" id="solution_focused_value">{{ user_profile.therapy_approaches.solution_focused|default(5) if user_profile else 5 }}</span>
+                                        <span class="small">10</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <label for="humanistic_rating" class="form-label">Humanistic/Person-Centered</label>
+                                    <input type="range" class="form-range" min="1" max="10" step="1" id="humanistic_rating" name="therapy_approaches[humanistic]" value="{{ user_profile.therapy_approaches.humanistic|default(5) if user_profile else 5 }}">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="small">1</span>
+                                        <span class="small text-center" id="humanistic_value">{{ user_profile.therapy_approaches.humanistic|default(5) if user_profile else 5 }}</span>
+                                        <span class="small">10</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <label for="dbt_rating" class="form-label">Dialectical Behavior Therapy (DBT)</label>
+                                    <input type="range" class="form-range" min="1" max="10" step="1" id="dbt_rating" name="therapy_approaches[dbt]" value="{{ user_profile.therapy_approaches.dbt|default(5) if user_profile else 5 }}">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="small">1</span>
+                                        <span class="small text-center" id="dbt_value">{{ user_profile.therapy_approaches.dbt|default(5) if user_profile else 5 }}</span>
+                                        <span class="small">10</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h4 class="mb-3">Topics to Focus On</h4>
+                        <div class="mb-4">
+                            <div class="form-floating">
+                                <textarea class="form-control" id="interests" name="interests" style="height: 100px">{{ user_profile.topic_interests.keys()|join(', ') if user_profile and user_profile.topic_interests else '' }}</textarea>
+                                <label for="interests">Topics of Interest (comma separated)</label>
+                                <div class="form-text">Enter topics you'd like to focus on in therapy sessions</div>
+                            </div>
+                        </div>
+                        
+                        <h4 class="mb-3">Sensitive Topics</h4>
+                        <div class="mb-4">
+                            <div class="form-floating">
+                                <textarea class="form-control" id="triggers" name="triggers" style="height: 100px">{{ user_profile.trigger_topics|map(attribute='topic')|join(', ') if user_profile and user_profile.trigger_topics else '' }}</textarea>
+                                <label for="triggers">Topics to Handle with Care (comma separated)</label>
+                                <div class="form-text">Enter topics that are sensitive or triggering for you</div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save Personalization Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="card-title mb-0">Delete Your Data</h3>
+                </div>
+                <div class="card-body">
+                    <p>You can permanently delete all AI learning data we have collected about you. This action cannot be undone.</p>
+                    
+                    <form id="delete-data-form" method="POST" action="{{ url_for('delete_ai_data') }}" onsubmit="return confirm('Are you sure you want to permanently delete all your AI learning data? This cannot be undone.');">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash-alt me-2"></i>Delete All My AI Learning Data
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h3 class="card-title mb-0">About AI Learning</h3>
+                </div>
+                <div class="card-body">
+                    <h5><i class="fas fa-brain me-2 text-primary"></i>How AI Learning Works</h5>
+                    <p>Our AI therapist uses machine learning to better understand your needs, preferences, and communication style over time. This allows for more personalized and effective therapy sessions.</p>
+                    
+                    <h5 class="mt-4"><i class="fas fa-shield-alt me-2 text-primary"></i>Privacy & Security</h5>
+                    <p>Your data is stored securely with end-to-end encryption. We never share your identifiable information with third parties. You control what data is collected and how long it's kept.</p>
+                    
+                    <h5 class="mt-4"><i class="fas fa-sliders-h me-2 text-primary"></i>Personalization Benefits</h5>
+                    <ul>
+                        <li>More relevant therapy approaches</li>
+                        <li>Better understanding of your unique needs</li>
+                        <li>Improved communication style matching</li>
+                        <li>More effective coping strategy recommendations</li>
+                        <li>Consistent progress tracking over time</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm bg-light">
+                <div class="card-body">
+                    <h5><i class="fas fa-question-circle me-2 text-primary"></i>Questions?</h5>
+                    <p>If you have any questions about how AI learning works or how your data is used, please contact our support team.</p>
+                    <div class="d-grid">
+                        <a href="#" class="btn btn-outline-primary">Contact Support</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Update slider values when they change
+    document.querySelectorAll('input[type="range"]').forEach(function(slider) {
+        const valueDisplay = document.getElementById(slider.id + '_value');
+        if (valueDisplay) {
+            slider.addEventListener('input', function() {
+                valueDisplay.textContent = slider.value;
+            });
+        }
+    });
+    
+    // Disable personalization form if consent is not given
+    const consentCheckbox = document.getElementById('data_collection_consent');
+    const personalizationForm = document.getElementById('personalization-form');
+    
+    function updatePersonalizationForm() {
+        if (personalizationForm) {
+            const formElements = personalizationForm.querySelectorAll('input, select, textarea, button');
+            formElements.forEach(function(element) {
+                element.disabled = !consentCheckbox.checked;
+            });
+            
+            if (!consentCheckbox.checked) {
+                personalizationForm.classList.add('opacity-50');
+            } else {
+                personalizationForm.classList.remove('opacity-50');
+            }
+        }
+    }
+    
+    if (consentCheckbox && personalizationForm) {
+        // Initial state
+        updatePersonalizationForm();
+        
+        // Update on change
+        consentCheckbox.addEventListener('change', updatePersonalizationForm);
+    }
+</script>
+{% endblock %} 

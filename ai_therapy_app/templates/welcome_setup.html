@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to Mental Health AI Therapy{% endblock %}
+
+{% block extra_css %}
+<style>
+    .welcome-header {
+        background-color: #6c5ce7;
+        color: white;
+        padding: 3rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0.5rem;
+    }
+    
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 2rem;
+    }
+    
+    .step {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin: 0 0.5rem;
+        position: relative;
+    }
+    
+    .step.active {
+        background-color: #6c5ce7;
+        color: white;
+    }
+    
+    .step.completed {
+        background-color: #20bf6b;
+        color: white;
+    }
+    
+    .step-line {
+        height: 3px;
+        background-color: #e9ecef;
+        flex-grow: 1;
+        margin: 20px 0.5rem;
+    }
+    
+    .step-line.completed {
+        background-color: #20bf6b;
+    }
+    
+    .avatar-card {
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        height: 100%;
+    }
+    
+    .avatar-card.selected {
+        border: 3px solid #6c5ce7;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        transform: translateY(-5px);
+    }
+    
+    .avatar-card:hover:not(.selected) {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+    }
+    
+    .avatar-img-container {
+        height: 220px;
+        overflow: hidden;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+    
+    .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .avatar-name {
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 5px;
+    }
+    
+    .avatar-section {
+        display: none;
+    }
+    
+    .avatar-section.active {
+        display: block;
+        animation: fadeIn 0.5s;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    .form-selector {
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="welcome-header text-center shadow-sm">
+        <h1 class="display-4 mb-2">Welcome, {{ user.full_name }}!</h1>
+        <p class="lead mb-0">Let's personalize your therapy experience</p>
+    </div>
+    
+    <div class="step-indicator mb-4">
+        <div class="step completed">1</div>
+        <div class="step-line completed"></div>
+        <div class="step active">2</div>
+        <div class="step-line"></div>
+        <div class="step">3</div>
+    </div>
+    
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-8 text-center">
+            <h2 class="mb-3">Choose Your AI Therapist</h2>
+            <p class="lead text-muted">Select a therapist appearance that you feel most comfortable with. Your therapist will appear during video sessions.</p>
+        </div>
+    </div>
+    
+    <form method="post" id="therapist-form" action="{{ url_for('welcome_setup') }}">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Step 1: Select Therapist Gender</h5>
+                <div class="form-selector">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="gender" id="gender-male" value="male" 
+                        {% if therapist_prefs.gender == 'male' %}checked{% endif %}>
+                        <label class="form-check-label" for="gender-male">Male</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="gender" id="gender-female" value="female"
+                        {% if therapist_prefs.gender == 'female' %}checked{% endif %}>
+                        <label class="form-check-label" for="gender-female">Female</label>
+                    </div>
+                </div>
+                
+                <h5 class="card-title mt-4">Step 2: Select Ethnicity</h5>
+                <div class="form-selector">
+                    <select class="form-select" name="ethnicity" id="ethnicity-select">
+                        <option value="caucasian" {% if therapist_prefs.ethnicity == 'caucasian' %}selected{% endif %}>Caucasian</option>
+                        <option value="african" {% if therapist_prefs.ethnicity == 'african' %}selected{% endif %}>African</option>
+                        <option value="asian" {% if therapist_prefs.ethnicity == 'asian' %}selected{% endif %}>Asian</option>
+                        <option value="hispanic" {% if therapist_prefs.ethnicity == 'hispanic' %}selected{% endif %}>Hispanic</option>
+                        <option value="middle_eastern" {% if therapist_prefs.ethnicity == 'middle_eastern' %}selected{% endif %}>Middle Eastern</option>
+                        <option value="south_asian" {% if therapist_prefs.ethnicity == 'south_asian' %}selected{% endif %}>South Asian</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <h5 class="mb-3">Step 3: Choose Your Therapist Avatar</h5>
+        <p class="text-muted mb-4">These photorealistic avatars are designed to provide a natural and comfortable therapy experience.</p>
+        
+        <input type="hidden" name="avatar_id" id="selected-avatar-id" value="{{ therapist_prefs.avatar_id }}">
+        
+        <!-- Male Avatars -->
+        {% for ethnicity, avatars in available_avatars.male.items() %}
+        <div class="avatar-section male-avatars {{ ethnicity }}-avatars {% if therapist_prefs.gender == 'male' and therapist_prefs.ethnicity == ethnicity %}active{% endif %}">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
+                {% for avatar in avatars %}
+                <div class="col">
+                    <div class="card avatar-card {% if therapist_prefs.avatar_id == avatar.id %}selected{% endif %}" data-avatar-id="{{ avatar.id }}">
+                        <div class="avatar-img-container">
+                            <img src="{{ url_for('static', filename='images/avatars/' + avatar.image) }}" class="avatar-img" alt="{{ avatar.name }}">
+                        </div>
+                        <div class="card-body">
+                            <h5 class="avatar-name">{{ avatar.name }}</h5>
+                            <p class="card-text">Professional therapist with expertise in cognitive behavioral therapy and mindfulness practices.</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        
+        <!-- Female Avatars -->
+        {% for ethnicity, avatars in available_avatars.female.items() %}
+        <div class="avatar-section female-avatars {{ ethnicity }}-avatars {% if therapist_prefs.gender == 'female' and therapist_prefs.ethnicity == ethnicity %}active{% endif %}">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
+                {% for avatar in avatars %}
+                <div class="col">
+                    <div class="card avatar-card {% if therapist_prefs.avatar_id == avatar.id %}selected{% endif %}" data-avatar-id="{{ avatar.id }}">
+                        <div class="avatar-img-container">
+                            <img src="{{ url_for('static', filename='images/avatars/' + avatar.image) }}" class="avatar-img" alt="{{ avatar.name }}">
+                        </div>
+                        <div class="card-body">
+                            <h5 class="avatar-name">{{ avatar.name }}</h5>
+                            <p class="card-text">Licensed therapist specializing in stress management and emotional wellbeing.</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary me-md-2">Skip for Now</a>
+            <button type="submit" class="btn btn-primary">Save & Continue</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle gender selection
+        const genderInputs = document.querySelectorAll('input[name="gender"]');
+        const ethnicitySelect = document.getElementById('ethnicity-select');
+        
+        // Function to update visible avatars
+        function updateVisibleAvatars() {
+            const gender = document.querySelector('input[name="gender"]:checked').value;
+            const ethnicity = ethnicitySelect.value;
+            
+            // Hide all avatar sections
+            document.querySelectorAll('.avatar-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Show the selected section
+            const selector = `.${gender}-avatars.${ethnicity}-avatars`;
+            const activeSection = document.querySelector(selector);
+            if (activeSection) {
+                activeSection.classList.add('active');
+            }
+        }
+        
+        // Add event listeners for gender change
+        genderInputs.forEach(input => {
+            input.addEventListener('change', updateVisibleAvatars);
+        });
+        
+        // Add event listener for ethnicity change
+        ethnicitySelect.addEventListener('change', updateVisibleAvatars);
+        
+        // Handle avatar selection
+        const avatarCards = document.querySelectorAll('.avatar-card');
+        const selectedAvatarInput = document.getElementById('selected-avatar-id');
+        
+        avatarCards.forEach(card => {
+            card.addEventListener('click', function() {
+                // Remove selected class from all cards
+                avatarCards.forEach(c => c.classList.remove('selected'));
+                
+                // Add selected class to clicked card
+                this.classList.add('selected');
+                
+                // Update hidden input value
+                selectedAvatarInput.value = this.dataset.avatarId;
+            });
+        });
+    });
+</script>
+{% endblock %} 

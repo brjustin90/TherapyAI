@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Mental Health AI Therapy{% endblock %}
+
+{% block content %}
+<div class="row align-items-center">
+    <div class="col-lg-6">
+        <h1 class="display-4 fw-bold mb-4">AI-Powered Mental Health Therapy</h1>
+        <p class="lead mb-4">
+            Our platform uses artificial intelligence to provide personalized mental health therapy services. 
+            We securely analyze your data to deliver tailored therapeutic interactions through voice conversations and video sessions.
+        </p>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-4">
+            {% if user %}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4 me-md-2">Go to Dashboard</a>
+                <a href="{{ url_for('new_session') }}" class="btn btn-outline-primary btn-lg px-4">Schedule Session</a>
+            {% else %}
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-4 me-md-2">Get Started</a>
+                <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-lg px-4">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" class="img-fluid rounded shadow" alt="Mental Health Therapy">
+    </div>
+</div>
+
+<hr class="my-5">
+
+<div class="row g-4 py-4">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-lock fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">Privacy First</h3>
+                <p class="card-text">Your data is securely collected with explicit consent. We use end-to-end encryption and follow strict privacy protocols.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-brain fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">AI-Powered</h3>
+                <p class="card-text">Our AI analyzes patterns in your data to personalize therapeutic approaches and provide continuous support.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-comments fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">Multiple Formats</h3>
+                <p class="card-text">Interact through voice conversations, video sessions, or text-based messaging - whatever works best for you.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12 text-center">
+        <h2 class="mb-4">How It Works</h2>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-3">
+        <div class="card border-0 bg-light h-100">
+            <div class="card-body text-center">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 60px; height: 60px;">
+                    <h3 class="mb-0">1</h3>
+                </div>
+                <h4>Sign Up</h4>
+                <p class="text-muted">Create an account and set your preferences</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 bg-light h-100">
+            <div class="card-body text-center">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 60px; height: 60px;">
+                    <h3 class="mb-0">2</h3>
+                </div>
+                <h4>Connect Data</h4>
+                <p class="text-muted">Grant permission to access relevant data</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 bg-light h-100">
+            <div class="card-body text-center">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 60px; height: 60px;">
+                    <h3 class="mb-0">3</h3>
+                </div>
+                <h4>Schedule Session</h4>
+                <p class="text-muted">Book your first therapy session</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 bg-light h-100">
+            <div class="card-body text-center">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 60px; height: 60px;">
+                    <h3 class="mb-0">4</h3>
+                </div>
+                <h4>Start Therapy</h4>
+                <p class="text-muted">Begin your personalized therapy journey</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12 text-center">
+        <h2 class="mb-4">Disclaimer</h2>
+        <p class="text-muted">
+            This application is not a replacement for professional mental health support. 
+            It is designed to supplement traditional therapy methods and provide additional support between professional sessions. 
+            If you are experiencing a mental health crisis, please contact your local emergency services or a mental health crisis hotline.
+        </p>
+    </div>
+</div>
+{% endblock %} 

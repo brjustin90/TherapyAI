@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule New Session - Mental Health AI Therapy{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h2 class="card-title mb-0">Schedule New Therapy Session</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Session Title</label>
+                        <input type="text" class="form-control" id="title" name="title" required placeholder="e.g., Weekly Check-in, Anxiety Management">
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="session_type" class="form-label">Session Type</label>
+                            <select class="form-select" id="session_type" name="session_type" required>
+                                <option value="" selected disabled>Select a session type</option>
+                                <option value="VOICE">Voice Chat</option>
+                                <option value="VIDEO">Video Call</option>
+                                <option value="TEXT">Text Chat</option>
+                                <option value="CHECK_IN">Quick Check-in</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="therapy_approach" class="form-label">Therapy Approach</label>
+                            <select class="form-select" id="therapy_approach" name="therapy_approach" required>
+                                <option value="" selected disabled>Select an approach</option>
+                                <option value="CBT">Cognitive Behavioral Therapy (CBT)</option>
+                                <option value="DBT">Dialectical Behavior Therapy (DBT)</option>
+                                <option value="MINDFULNESS">Mindfulness-Based Therapy</option>
+                                <option value="MOTIVATIONAL">Motivational Interviewing</option>
+                                <option value="SOLUTION_FOCUSED">Solution-Focused Brief Therapy</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="scheduled_date" class="form-label">Date</label>
+                            <input type="date" class="form-control" id="scheduled_date" name="scheduled_date" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="scheduled_time" class="form-label">Time</label>
+                            <input type="time" class="form-control" id="scheduled_time" name="scheduled_time" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="duration" class="form-label">Duration (minutes)</label>
+                            <select class="form-select" id="duration" name="duration">
+                                <option value="30">30 minutes</option>
+                                <option value="45">45 minutes</option>
+                                <option value="60" selected>60 minutes (1 hour)</option>
+                                <option value="90">90 minutes (1.5 hours)</option>
+                                <option value="120">120 minutes (2 hours)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description (optional)</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="What would you like to focus on in this session?"></textarea>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('sessions') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Schedule Session</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Set default date time to tomorrow at the next hour
+    document.addEventListener('DOMContentLoaded', function() {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(tomorrow.getHours() + 1);
+        tomorrow.setMinutes(0);
+        tomorrow.setSeconds(0);
+        
+        // Format for datetime-local input
+        const year = tomorrow.getFullYear();
+        const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+        const day = String(tomorrow.getDate()).padStart(2, '0');
+        const hours = String(tomorrow.getHours()).padStart(2, '0');
+        const minutes = String(tomorrow.getMinutes()).padStart(2, '0');
+        
+        const formattedDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+        document.getElementById('scheduled_start').value = formattedDateTime;
+    });
+</script>
+{% endblock %} 

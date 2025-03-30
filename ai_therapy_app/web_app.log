@@ -1,0 +1,19 @@
+2025-03-08 23:13:40,077 - web_app - INFO - Starting application with Redis host: deciding-octopus-57626.upstash.io
+2025-03-08 23:13:40,114 - web_app - INFO - Database engine initialized successfully
+2025-03-08 23:13:41,808 - web_app - INFO - Redis connection established successfully
+2025-03-08 23:13:41,827 - web_app - INFO - Database tables created successfully
+2025-03-08 23:13:41,847 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8000
+ * Running on http://10.5.0.2:8000
+2025-03-08 23:13:41,847 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-03-08 23:13:42,409 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:42] "GET / HTTP/1.1" 200 -
+2025-03-08 23:13:42,532 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:42] "GET /static/css/style.css HTTP/1.1" 200 -
+2025-03-08 23:13:44,148 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:44] "GET /static/js/main.js HTTP/1.1" 200 -
+2025-03-08 23:13:46,122 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:46] "[33mGET /static/img/favicon.png HTTP/1.1[0m" 404 -
+2025-03-08 23:13:53,489 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:53] "GET /register HTTP/1.1" 200 -
+2025-03-08 23:13:53,542 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:53] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-03-08 23:13:53,546 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:53] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2025-03-08 23:13:58,904 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:58] "GET / HTTP/1.1" 200 -
+2025-03-08 23:13:58,966 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:58] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2025-03-08 23:13:58,967 - werkzeug - INFO - 127.0.0.1 - - [08/Mar/2025 23:13:58] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -

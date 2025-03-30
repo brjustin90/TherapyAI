@@ -1,0 +1,649 @@
+{% extends "base.html" %}
+
+{% block title %}Video Therapy Session - Mental Health AI Therapy{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/video-call.css') }}">
+<style>
+    /* Additional styles specific to video sessions */
+    body {
+        background-color: #f8f9fa;
+    }
+    
+    .debug-info {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+        color: #721c24;
+    }
+    
+    .error-message {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+        color: #721c24;
+    }
+    
+    .permission-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.9);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .permission-overlay h2 {
+        margin-bottom: 1.5rem;
+    }
+    
+    .permission-overlay p {
+        margin-bottom: 2rem;
+        max-width: 600px;
+    }
+    
+    .permission-overlay .btn {
+        font-size: 1.2rem;
+        padding: 0.5rem 2rem;
+    }
+    
+    .session-info {
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    
+    .mood-check {
+        margin-top: 2rem;
+        background-color: white;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    
+    .mood-emoji {
+        font-size: 1.5rem;
+    }
+    
+    /* Photorealistic Avatar Styles */
+    .avatar-container {
+        background-color: rgba(255, 255, 255, 0.9);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        margin-bottom: 20px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+    }
+    
+    .therapist-info {
+        margin-bottom: 15px;
+        text-align: center;
+        width: 100%;
+    }
+    
+    .therapist-name {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #2c3e50;
+    }
+    
+    .therapist-bio {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+        margin-bottom: 0;
+    }
+    
+    .photorealistic-avatar {
+        width: 100%;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+    
+    .photorealistic-avatar img {
+        max-width: 100%;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+    }
+    
+    /* Subtle animation for the avatar */
+    @keyframes subtle-breathing {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.01); }
+    }
+    
+    .photorealistic-avatar img {
+        animation: subtle-breathing 5s infinite ease-in-out;
+    }
+    
+    /* Talking animation class - will be added via JavaScript */
+    .photorealistic-avatar.talking img {
+        animation: talking 0.5s infinite alternate ease-in-out;
+    }
+    
+    @keyframes talking {
+        0% { transform: scale(1); }
+        100% { transform: scale(1.015); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Debug Information (only shown in debug mode) -->
+{% if config.DEBUG %}
+<div class="debug-info">
+    <h4>Debug Information:</h4>
+    <p>Session ID: {{ session.id }}</p>
+    <p>Session Type: {{ session.session_type }}</p>
+    <p>Selected Avatar:</p>
+    <ul>
+        <li>Gender: {{ therapist_prefs.get('gender', 'Not set') }}</li>
+        <li>Ethnicity: {{ therapist_prefs.get('ethnicity', 'Not set') }}</li>
+        <li>Avatar ID: {{ therapist_prefs.get('avatar_id', 'Not set') }}</li>
+    </ul>
+    {% if selected_avatar %}
+    <p>Avatar Image Path: {{ selected_avatar.image }}</p>
+    {% else %}
+    <p>No avatar selected!</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Error Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<!-- Camera Permission Overlay -->
+<div class="permission-overlay" id="permission-overlay">
+    <h2><i class="fas fa-video me-2"></i>Camera & Microphone Access Needed</h2>
+    <p>This video therapy session requires access to your camera and microphone. Your privacy is important to us - this session is private and secure.</p>
+    <button class="btn btn-primary btn-lg" id="grant-permission-btn">
+        <i class="fas fa-check-circle me-2"></i>Grant Access & Begin Session
+    </button>
+    <p class="mt-4 small">
+        <i class="fas fa-shield-alt me-1"></i>
+        Your session is end-to-end encrypted and not recorded unless you provide explicit consent.
+    </p>
+</div>
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="mb-2">{{ session.title }}</h1>
+            <p class="text-muted">
+                {{ session.therapy_approach }} | Video Session | 
+                <span id="session-status" class="badge {% if session.status == 'IN_PROGRESS' %}bg-info{% elif session.status == 'COMPLETED' %}bg-success{% else %}bg-primary{% endif %}">
+                    {{ session.status }}
+                </span>
+            </p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <a href="{{ url_for('view_session', session_id=session.id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-info-circle me-2"></i>Session Details
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-9">
+            <!-- Video Call Interface -->
+            <div class="video-call-container">
+                <div class="video-main">
+                    <!-- Photorealistic Therapist Avatar -->
+                    <div id="avatar-container" class="avatar-container">
+                        <!-- Information about the selected therapist -->
+                        <div id="therapist-info" class="therapist-info mb-2">
+                            <h4 class="therapist-name">{{ selected_avatar.name }}</h4>
+                            <p class="therapist-bio">Professional therapist specialized in {{ session.therapy_approach }}</p>
+                        </div>
+                        <!-- Photorealistic avatar image -->
+                        <div class="photorealistic-avatar">
+                            <img src="{{ url_for('static', filename='images/avatars/' + selected_avatar.image) }}" 
+                                id="therapist-avatar-image"
+                                alt="{{ selected_avatar.name }}" 
+                                class="img-fluid rounded" />
+                        </div>
+                    </div>
+                </div>
+                <div class="video-chat" id="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <!-- Messages will be added here by JavaScript -->
+                        <div class="system-message">
+                            <p>Session will begin when you grant camera access and click "Start Session".</p>
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <input type="text" class="chat-input form-control" id="chat-input" placeholder="Type a message..." disabled>
+                        <button class="btn btn-primary chat-send" id="chat-send-btn" disabled>
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mood Check-in (after session) -->
+            <div class="mood-check d-none" id="mood-check">
+                <h3 class="mb-3">Before You Go: Quick Mood Check</h3>
+                <p>How are you feeling after today's session?</p>
+                
+                <form id="mood-form">
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center">
+                            <span class="mood-emoji">😔</span>
+                            <input type="range" class="form-range mx-2" min="1" max="10" step="1" id="mood-score" value="5">
+                            <span class="mood-emoji">😊</span>
+                        </div>
+                        <div class="text-center mt-1">
+                            <span id="mood-value">5</span>/10
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="mood-notes" class="form-label">Any thoughts you'd like to share?</label>
+                        <textarea class="form-control" id="mood-notes" rows="2" placeholder="Optional notes about how you're feeling..."></textarea>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check me-2"></i>Submit & Finish
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="col-lg-3">
+            <!-- Session Information -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Session Info</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Date:</strong> {{ session.scheduled_start.strftime('%b %d, %Y') }}</p>
+                    <p><strong>Time:</strong> {{ session.scheduled_start.strftime('%I:%M %p') }} - {{ session.scheduled_end.strftime('%I:%M %p') }}</p>
+                    <p><strong>Duration:</strong> {{ ((session.scheduled_end - session.scheduled_start).total_seconds() / 60)|int }} minutes</p>
+                    
+                    {% if session.description %}
+                        <p><strong>Description:</strong> {{ session.description }}</p>
+                    {% endif %}
+                    
+                    <div class="d-grid mt-3">
+                        <button class="btn btn-success" id="start-session-btn" disabled>
+                            <i class="fas fa-play-circle me-2"></i>Start Session
+                        </button>
+                        <button class="btn btn-danger mt-2 d-none" id="end-session-btn">
+                            <i class="fas fa-stop-circle me-2"></i>End Session
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Video Controls -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Controls</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" id="mic-toggle" disabled>
+                            <i class="fas fa-microphone me-2"></i>Mute Microphone
+                        </button>
+                        <button class="btn btn-outline-primary" id="camera-toggle" disabled>
+                            <i class="fas fa-video me-2"></i>Turn Off Camera
+                        </button>
+                        <button class="btn btn-outline-secondary" id="fullscreen-toggle" disabled>
+                            <i class="fas fa-expand me-2"></i>Fullscreen
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tips for the Session -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Session Tips</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li>Find a quiet, private space</li>
+                        <li>Ensure good lighting on your face</li>
+                        <li>Have water nearby</li>
+                        <li>Consider taking notes</li>
+                        <li>Be open and honest with the AI</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Load avatar and video call scripts -->
+<script src="{{ url_for('static', filename='js/avatar/avatar.js') }}"></script>
+<script type="module">
+    import { TherapyVideoCall } from "{{ url_for('static', filename='js/video-call.js') }}";
+    
+    // Session ID from Flask
+    const sessionId = "{{ session.id }}";
+    
+    // DOM elements
+    const permissionOverlay = document.getElementById('permission-overlay');
+    const grantPermissionBtn = document.getElementById('grant-permission-btn');
+    const startSessionBtn = document.getElementById('start-session-btn');
+    const endSessionBtn = document.getElementById('end-session-btn');
+    const micToggleBtn = document.getElementById('mic-toggle');
+    const cameraToggleBtn = document.getElementById('camera-toggle');
+    const fullscreenToggleBtn = document.getElementById('fullscreen-toggle');
+    const avatarContainer = document.getElementById('avatar-container');
+    const chatContainer = document.getElementById('chat-container');
+    const chatInput = document.getElementById('chat-input');
+    const chatSendBtn = document.getElementById('chat-send-btn');
+    const moodCheck = document.getElementById('mood-check');
+    const sessionStatusBadge = document.getElementById('session-status');
+    
+    let videoCall = null;
+    
+    // Helper function to add system messages
+    function addSystemMessage(message) {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'system-message';
+        
+        const messageP = document.createElement('p');
+        messageP.textContent = message;
+        
+        messageDiv.appendChild(messageP);
+        chatMessages.appendChild(messageDiv);
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    // Start permission flow when user clicks the button
+    grantPermissionBtn.addEventListener('click', async () => {
+        try {
+            // Initialize video call interface
+            videoCall = new TherapyVideoCall({
+                avatarContainer: avatarContainer,
+                sessionId: sessionId,
+                chatContainer: chatContainer,
+                autoStartUserMedia: false
+            });
+            
+            await videoCall.initialize();
+            
+            // Request user media permissions
+            try {
+                await videoCall._requestUserMedia();
+                
+                // Enable buttons now that we have permissions
+                startSessionBtn.disabled = false;
+                micToggleBtn.disabled = false;
+                cameraToggleBtn.disabled = false;
+                fullscreenToggleBtn.disabled = false;
+                
+                // Hide permission overlay
+                permissionOverlay.style.display = 'none';
+                
+                // Add system message
+                addSystemMessage('Camera access granted. Click "Start Session" to begin your therapy session.');
+            } catch (error) {
+                console.error('Media access error:', error);
+                addSystemMessage('Failed to access camera or microphone. Please ensure they are connected and you have granted permission.');
+            }
+        } catch (error) {
+            console.error('Error initializing video call:', error);
+            addSystemMessage('Error initializing video call. Please refresh the page and try again.');
+        }
+    });
+    
+    // Start session button
+    startSessionBtn.addEventListener('click', async () => {
+        if (!videoCall) return;
+        
+        // Disable start button
+        startSessionBtn.disabled = true;
+        startSessionBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Starting...';
+        
+        try {
+            console.log('Attempting to start video session with ID:', sessionId);
+            
+            // Call API to update session status
+            const response = await fetch(`/sessions/${sessionId}/videocall`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: 'start' })
+            });
+            
+            console.log('API response status:', response.status);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to start session: ${response.status} ${response.statusText}`);
+            }
+            
+            const responseData = await response.json();
+            console.log('API response data:', responseData);
+            
+            // Start video call
+            await videoCall.startCall();
+            
+            // Update UI
+            startSessionBtn.classList.add('d-none');
+            endSessionBtn.classList.remove('d-none');
+            chatInput.disabled = false;
+            chatSendBtn.disabled = false;
+            sessionStatusBadge.textContent = 'IN_PROGRESS';
+            sessionStatusBadge.className = 'badge bg-info';
+        } catch (error) {
+            console.error('Error starting session:', error);
+            startSessionBtn.disabled = false;
+            startSessionBtn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Start Session';
+            addSystemMessage('Failed to start session. Please try again. Error: ' + error.message);
+        }
+    });
+    
+    // End session button
+    endSessionBtn.addEventListener('click', async () => {
+        if (!videoCall) return;
+        
+        if (!confirm('Are you sure you want to end this therapy session?')) {
+            return;
+        }
+        
+        // Disable end button
+        endSessionBtn.disabled = true;
+        endSessionBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Ending...';
+        
+        try {
+            // End the video call
+            await videoCall.endCall();
+            
+            // Call API to update session status
+            const response = await fetch(`/sessions/${sessionId}/videocall`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: 'end' })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to end session');
+            }
+            
+            // Update UI
+            sessionStatusBadge.textContent = 'COMPLETED';
+            sessionStatusBadge.className = 'badge bg-success';
+            chatInput.disabled = true;
+            chatSendBtn.disabled = true;
+            micToggleBtn.disabled = true;
+            cameraToggleBtn.disabled = true;
+            
+            // Show mood check form
+            moodCheck.classList.remove('d-none');
+        } catch (error) {
+            console.error('Error ending session:', error);
+            endSessionBtn.disabled = false;
+            endSessionBtn.innerHTML = '<i class="fas fa-stop-circle me-2"></i>End Session';
+            addSystemMessage('Failed to end session. Please try again.');
+        }
+    });
+    
+    // Microphone toggle
+    micToggleBtn.addEventListener('click', () => {
+        if (!videoCall) return;
+        
+        videoCall.toggleMic();
+        
+        if (videoCall.isMicMuted) {
+            micToggleBtn.innerHTML = '<i class="fas fa-microphone-slash me-2"></i>Unmute Microphone';
+            micToggleBtn.classList.replace('btn-outline-primary', 'btn-outline-danger');
+        } else {
+            micToggleBtn.innerHTML = '<i class="fas fa-microphone me-2"></i>Mute Microphone';
+            micToggleBtn.classList.replace('btn-outline-danger', 'btn-outline-primary');
+        }
+    });
+    
+    // Camera toggle
+    cameraToggleBtn.addEventListener('click', () => {
+        if (!videoCall) return;
+        
+        videoCall.toggleCamera();
+        
+        if (videoCall.isCameraOff) {
+            cameraToggleBtn.innerHTML = '<i class="fas fa-video-slash me-2"></i>Turn On Camera';
+            cameraToggleBtn.classList.replace('btn-outline-primary', 'btn-outline-danger');
+        } else {
+            cameraToggleBtn.innerHTML = '<i class="fas fa-video me-2"></i>Turn Off Camera';
+            cameraToggleBtn.classList.replace('btn-outline-danger', 'btn-outline-primary');
+        }
+    });
+    
+    // Fullscreen toggle
+    fullscreenToggleBtn.addEventListener('click', () => {
+        const videoCallContainer = document.querySelector('.video-call-container');
+        
+        if (!document.fullscreenElement) {
+            // Enter fullscreen
+            if (videoCallContainer.requestFullscreen) {
+                videoCallContainer.requestFullscreen();
+            } else if (videoCallContainer.webkitRequestFullscreen) {
+                videoCallContainer.webkitRequestFullscreen();
+            } else if (videoCallContainer.msRequestFullscreen) {
+                videoCallContainer.msRequestFullscreen();
+            }
+            
+            fullscreenToggleBtn.innerHTML = '<i class="fas fa-compress me-2"></i>Exit Fullscreen';
+        } else {
+            // Exit fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+            
+            fullscreenToggleBtn.innerHTML = '<i class="fas fa-expand me-2"></i>Fullscreen';
+        }
+    });
+    
+    // Chat send button
+    chatSendBtn.addEventListener('click', async () => {
+        const message = chatInput.value.trim();
+        if (!message || !videoCall) return;
+        
+        // Clear input
+        chatInput.value = '';
+        
+        // Send message via the video call
+        await videoCall.sendTextMessage(message);
+    });
+    
+    // Chat input enter key
+    chatInput.addEventListener('keypress', async (e) => {
+        if (e.key === 'Enter') {
+            const message = chatInput.value.trim();
+            if (!message || !videoCall) return;
+            
+            // Clear input
+            chatInput.value = '';
+            
+            // Send message via the video call
+            await videoCall.sendTextMessage(message);
+        }
+    });
+    
+    // Mood score slider
+    const moodScoreSlider = document.getElementById('mood-score');
+    const moodValueDisplay = document.getElementById('mood-value');
+    
+    moodScoreSlider.addEventListener('input', () => {
+        moodValueDisplay.textContent = moodScoreSlider.value;
+    });
+    
+    // Mood form submission
+    const moodForm = document.getElementById('mood-form');
+    
+    moodForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const moodScore = moodScoreSlider.value;
+        const moodNotes = document.getElementById('mood-notes').value;
+        
+        try {
+            // Submit mood check
+            const response = await fetch(`/api/v1/moods`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    score: moodScore,
+                    notes: moodNotes
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to submit mood check');
+            }
+            
+            // Redirect to session details
+            window.location.href = `/view_session/${sessionId}`;
+        } catch (error) {
+            console.error('Error submitting mood check:', error);
+            alert('Failed to submit mood check. Please try again.');
+        }
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}Session Details - Mental Health AI Therapy{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1 class="mb-2">{{ session.title }}</h1>
+        <p class="text-muted">
+            {{ session.therapy_approach }} | {{ session.session_type }} | 
+            <span class="badge {% if session.status == 'IN_PROGRESS' %}bg-info{% elif session.status == 'COMPLETED' %}bg-success{% elif session.status == 'CANCELLED' %}bg-danger{% else %}bg-primary{% endif %}">
+                {{ session.status }}
+            </span>
+        </p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <div class="btn-group">
+            {% if session.status == 'SCHEDULED' or session.status == 'IN_PROGRESS' %}
+                {% if session.session_type == 'VIDEO' %}
+                    <a href="{{ url_for('video_session', session_id=session.id) }}" class="btn btn-primary">
+                        <i class="fas fa-video me-2"></i>
+                        {% if session.status == 'IN_PROGRESS' %}
+                            Continue Video Session
+                        {% else %}
+                            Start Video Session
+                        {% endif %}
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('session_chat', session_id=session.id) }}" class="btn btn-primary">
+                        <i class="fas fa-comments me-2"></i>
+                        {% if session.status == 'IN_PROGRESS' %}
+                            Continue Session
+                        {% else %}
+                            Start Session
+                        {% endif %}
+                    </a>
+                {% endif %}
+            {% endif %}
+            <a href="{{ url_for('sessions') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Sessions
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h3 class="card-title mb-0">Session Details</h3>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <p class="mb-0"><strong>Date:</strong></p>
+                        <p>{{ session.scheduled_start.strftime('%B %d, %Y') }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-0"><strong>Time:</strong></p>
+                        <p>{{ session.scheduled_start.strftime('%I:%M %p') }} - {{ session.scheduled_end.strftime('%I:%M %p') }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-0"><strong>Duration:</strong></p>
+                        <p>{{ ((session.scheduled_end - session.scheduled_start).total_seconds() / 60)|int }} minutes</p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <p class="mb-0"><strong>Session Type:</strong></p>
+                        <p>{{ session.session_type }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-0"><strong>Therapy Approach:</strong></p>
+                        <p>{{ session.therapy_approach }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-0"><strong>Status:</strong></p>
+                        <p>{{ session.status }}</p>
+                    </div>
+                </div>
+                
+                {% if session.description %}
+                    <div class="mb-3">
+                        <p class="mb-0"><strong>Description:</strong></p>
+                        <p>{{ session.description }}</p>
+                    </div>
+                {% endif %}
+                
+                {% if session.notes %}
+                    <div class="mb-3">
+                        <p class="mb-0"><strong>Session Notes:</strong></p>
+                        <p>{{ session.notes }}</p>
+                    </div>
+                {% endif %}
+                
+                {% if session.actual_start %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-0"><strong>Actual Start:</strong></p>
+                            <p>{{ session.actual_start.strftime('%I:%M %p') }}</p>
+                        </div>
+                        {% if session.actual_end %}
+                            <div class="col-md-6">
+                                <p class="mb-0"><strong>Actual End:</strong></p>
+                                <p>{{ session.actual_end.strftime('%I:%M %p') }}</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h3 class="card-title mb-0">Conversation History</h3>
+            </div>
+            <div class="card-body">
+                {% if messages %}
+                    <div class="list-group">
+                        {% for message in messages %}
+                            <div class="list-group-item {% if message.is_from_ai %}list-group-item-light{% endif %}">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ 'AI Assistant' if message.is_from_ai else 'You' }}</h6>
+                                    <small>{{ message.timestamp.strftime('%I:%M %p') }}</small>
+                                </div>
+                                <p class="mb-1">{{ message.content }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No messages yet. Start the session to begin the conversation.</p>
+                {% endif %}
+            </div>
+            {% if messages %}
+                <div class="card-footer">
+                    <a href="{{ url_for('session_chat', session_id=session.id) }}" class="btn btn-outline-primary">
+                        <i class="fas fa-comments me-2"></i>Continue Conversation
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h3 class="card-title mb-0">Actions</h3>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if session.status == 'SCHEDULED' %}
+                        <a href="{{ url_for('session_chat', session_id=session.id) }}" class="btn btn-primary">
+                            <i class="fas fa-play me-2"></i>Start Session
+                        </a>
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                            <i class="fas fa-times-circle me-2"></i>Cancel Session
+                        </button>
+                    {% elif session.status == 'IN_PROGRESS' %}
+                        <a href="{{ url_for('session_chat', session_id=session.id) }}" class="btn btn-primary">
+                            <i class="fas fa-comments me-2"></i>Continue Session
+                        </a>
+                        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#completeModal">
+                            <i class="fas fa-check-circle me-2"></i>Complete Session
+                        </button>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('new_session') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-calendar-plus me-2"></i>Schedule New Session
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        {% if session.session_type == 'VIDEO' and session.recording_url %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h3 class="card-title mb-0">Session Recording</h3>
+                </div>
+                <div class="card-body">
+                    <p>This session was recorded. You can view the recording below:</p>
+                    <div class="ratio ratio-16x9">
+                        <video controls>
+                            <source src="{{ session.recording_url }}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h3 class="card-title mb-0">Session Insights</h3>
+            </div>
+            <div class="card-body">
+                {% if messages %}
+                    <p><strong>Topics Discussed:</strong></p>
+                    <ul>
+                        <li>Anxiety management</li>
+                        <li>Stress reduction techniques</li>
+                        <li>Sleep improvement</li>
+                    </ul>
+                    
+                    <p><strong>Mood Trend:</strong></p>
+                    <div class="progress mb-3">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 65%">Positive</div>
+                    </div>
+                    
+                    <p><strong>Recommended Focus:</strong></p>
+                    <p>Continue practicing mindfulness techniques discussed in the session.</p>
+                {% else %}
+                    <p class="text-muted">Insights will be available after the session begins.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Session Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cancelModalLabel">Cancel Session</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to cancel this therapy session?</p>
+                <p class="text-muted">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" id="confirmCancel">Cancel Session</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Complete Session Modal -->
+<div class="modal fade" id="completeModal" tabindex="-1" aria-labelledby="completeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="completeModalLabel">Complete Session</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to mark this session as completed?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="confirmComplete">Complete Session</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Handle session cancellation
+    document.getElementById('confirmCancel').addEventListener('click', function() {
+        // In a real app, this would be an AJAX call to update the session status
+        alert('Session cancelled successfully!');
+        window.location.reload();
+    });
+    
+    // Handle session completion
+    document.getElementById('confirmComplete').addEventListener('click', function() {
+        // In a real app, this would be an AJAX call to update the session status
+        alert('Session completed successfully!');
+        window.location.reload();
+    });
+</script>
+{% endblock %} 
