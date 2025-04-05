@@ -16,6 +16,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.ai.personalization import personalization_engine
+from base64 import b64encode
+from ai_therapy_app.llm_service import get_llm_response, clear_session_history
 # Remove the direct import from here to avoid circular imports
 
 # Configure logging
@@ -423,47 +425,67 @@ def session_chat(session_id):
                 personalization_context = personalization_engine.generate_personalization_context(user.id)
                 
                 # Generate AI response using LLM service
-                ai_response = get_llm_response(
+                ai_text_response, ai_audio_data = get_llm_response(
                     message_content, 
                     str(session_id), 
                     str(user.id), 
                     personalization_context
                 )
                 
-                # Save AI response
-                ai_message = TherapyMessage(
-                    session_id=session_id,
-                    content=ai_response,
-                    is_from_ai=True,
-                    timestamp=datetime.now()
-                )
-                db_session.add(ai_message)
+                # Save AI response (using text part)
+                if ai_text_response:
+                    ai_message = TherapyMessage(
+                        session_id=session_id,
+                        content=ai_text_response, # Use the text response
+                        is_from_ai=True,
+                        timestamp=datetime.now()
+                    )
+                    db_session.add(ai_message)
                 
-                # Update session status if needed
-                if session.status == 'SCHEDULED':
-                    session.status = 'IN_PROGRESS'
-                    session.actual_start = datetime.now()
+                    # Log the topics discussed in this interaction
+                    session_data = {
+                        'session_id': session_id,
+                        'message_pair': {
+                            'user': message_content,
+                            'ai': ai_text_response
+                        }
+                    }
+                    
+                    # Update the personalization engine with this interaction
+                    personalization_engine.update_profile_from_session(user.id, session_data)
+                    
+                    db_session.commit()
                 
-                db_session.commit()
-                
-                # For AJAX requests, return JSON response
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+                    # --- Updated to include audio data (base64 encoded) --- 
+                    audio_base64 = None
+                    if ai_audio_data:
+                        audio_base64 = b64encode(ai_audio_data).decode('utf-8')
+
                     return jsonify({
                         'success': True,
-                        'response': ai_response
+                        'response': ai_text_response,
+                        'audio': audio_base64,
+                        'audio_format': 'wav',
+                        'session_id': session_id
                     })
-                
-                # For form submissions, redirect back to chat
-                flash('Message sent!', 'success')
-                return redirect(url_for('session_chat', session_id=session_id))
-        
-        # Get session messages
-        messages = db_session.query(TherapyMessage).filter_by(session_id=session_id).order_by(TherapyMessage.timestamp).all()
-        
-        # Get current datetime for template
-        now = datetime.now()
-        
-        return render_template('session_chat.html', user=user, session=session, messages=messages, now=now)
+                    # ------------------------------------------------------
+                else:
+                    # Handle case where LLM failed
+                    logger.error(f"LLM failed to generate text response for session {session_id}")
+                    db_session.rollback() # Rollback the user message save if AI fails?
+                    return jsonify({
+                        'success': False,
+                        'message': 'AI failed to generate a response.',
+                        'session_id': session_id
+                    }), 500
+            
+            # Get session messages
+            messages = db_session.query(TherapyMessage).filter_by(session_id=session_id).order_by(TherapyMessage.timestamp).all()
+            
+            # Get current datetime for template
+            now = datetime.now()
+            
+            return render_template('session_chat.html', user=user, session=session, messages=messages, now=now)
     finally:
         db_session.close()
 
@@ -738,43 +760,23 @@ def video_session(session_id):
 @app.route('/sessions/<session_id>/videocall', methods=['POST'])
 @login_required
 def video_call_api(session_id):
-    """API endpoint for video call functionality"""
+    """Handle actions during a video call session (start, end, message)"""
     db_session = get_db()
     try:
         user = get_current_user()
+        therapy_session = db_session.query(TherapySession).filter_by(id=session_id, user_id=user.id).first_or_404()
         
-        # Log request data for debugging
-        logger.info(f"Received video call API request for session {session_id}")
-        logger.info(f"Request data: {request.json}")
+        data = request.json
+        action = data.get('action')
         
-        # Get the therapy session
-        therapy_session = db_session.query(TherapySession).filter_by(id=session_id, user_id=user.id).first()
-        if therapy_session is None:
-            logger.error(f"Session {session_id} not found for user {user.id}")
-            return jsonify({
-                'success': False,
-                'message': 'Session not found'
-            }), 404
-        
-        # Parse request data
-        try:
-            data = request.json or {}
-            action = data.get('action')
-            logger.info(f"Action: {action}")
-        except Exception as e:
-            logger.error(f"Error parsing request data: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': f'Invalid request data: {str(e)}'
-            }), 400
-        
+        logger.info(f"Received action '{action}' for video session {session_id}")
+
         if action == 'start':
-            logger.info(f"Starting video session {session_id}")
-            # Update session status
-            therapy_session.status = 'IN_PROGRESS'
-            therapy_session.actual_start = datetime.now()
-            db_session.commit()
-            
+            # Update session status to IN_PROGRESS if it's SCHEDULED
+            if therapy_session.status == 'SCHEDULED':
+                therapy_session.status = 'IN_PROGRESS'
+                therapy_session.actual_start = datetime.now()
+                db_session.commit()
             return jsonify({
                 'success': True,
                 'message': 'Video call started',
@@ -783,18 +785,13 @@ def video_call_api(session_id):
             })
             
         elif action == 'end':
-            logger.info(f"Ending video session {session_id}")
-            # Update session status
+            # Update session status to COMPLETED
             therapy_session.status = 'COMPLETED'
             therapy_session.actual_end = datetime.now()
             db_session.commit()
             
-            # Handle session end in personalization engine
-            personalization_engine.handle_session_end(user.id)
-            
             # Clear LLM conversation history
-            from ai_therapy_app.llm_service import clear_session_history
-            clear_session_history(session_id)
+            clear_session_history(str(session_id)) # Ensure session_id is string if needed by llm_service
             
             return jsonify({
                 'success': True,
@@ -813,7 +810,7 @@ def video_call_api(session_id):
                     'message': 'No message provided'
                 }), 400
             
-            # Save user message
+            # Save user message first
             new_message = TherapyMessage(
                 session_id=session_id,
                 content=user_message,
@@ -821,47 +818,69 @@ def video_call_api(session_id):
                 timestamp=datetime.now()
             )
             db_session.add(new_message)
+            # Commit the user message immediately so it appears even if AI fails
+            db_session.commit() 
             
             # Get personalization context for the user
             personalization_context = personalization_engine.generate_personalization_context(user.id)
             
             # Generate AI response using LLM service
-            from ai_therapy_app.llm_service import get_llm_response
-            ai_response = get_llm_response(
+            # --- Updated to handle (text, audio) tuple --- 
+            ai_text_response, ai_audio_data = get_llm_response(
                 user_message, 
-                session_id, 
+                str(session_id), # Ensure session_id is string
                 str(user.id), 
                 personalization_context
             )
+            # --------------------------------------------
             
-            # Save AI response
-            ai_message = TherapyMessage(
-                session_id=session_id,
-                content=ai_response,
-                is_from_ai=True,
-                timestamp=datetime.now()
-            )
-            db_session.add(ai_message)
+            # Save AI response (using text part) if successful
+            if ai_text_response:
+                ai_message = TherapyMessage(
+                    session_id=session_id,
+                    content=ai_text_response, # Use the text response
+                    is_from_ai=True,
+                    timestamp=datetime.now()
+                )
+                db_session.add(ai_message)
             
-            # Log the topics discussed in this interaction
-            session_data = {
-                'session_id': session_id,
-                'message_pair': {
-                    'user': user_message,
-                    'ai': ai_response
+                # Log the topics discussed in this interaction
+                session_data = {
+                    'session_id': session_id,
+                    'message_pair': {
+                        'user': user_message,
+                        'ai': ai_text_response # Use text response here too
+                    }
                 }
-            }
+                
+                # Update the personalization engine with this interaction
+                personalization_engine.update_profile_from_session(user.id, session_data)
+                
+                # Commit the AI message and personalization update
+                db_session.commit()
             
-            # Update the personalization engine with this interaction
-            personalization_engine.update_profile_from_session(user.id, session_data)
-            
-            db_session.commit()
-            
-            return jsonify({
-                'success': True,
-                'response': ai_response,
-                'session_id': session_id
-            })
+                # --- Prepare JSON response including audio --- 
+                audio_base64 = None
+                if ai_audio_data:
+                    audio_base64 = b64encode(ai_audio_data).decode('utf-8')
+
+                return jsonify({
+                    'success': True,
+                    'response': ai_text_response,
+                    'audio': audio_base64,
+                    'audio_format': 'wav',
+                    'session_id': session_id
+                })
+                # ---------------------------------------------
+            else:
+                # Handle case where LLM failed to generate text
+                logger.error(f"LLM failed to generate text response for video session {session_id}")
+                # User message is already saved, so just return error
+                return jsonify({
+                    'success': False,
+                    'message': 'AI failed to generate a response.',
+                    'session_id': session_id
+                }), 500 # Indicate server error
             
         else:
             logger.error(f"Unknown action: {action}")
@@ -871,7 +890,7 @@ def video_call_api(session_id):
             }), 400
     except Exception as e:
         logger.error(f"Error in video_call_api: {str(e)}")
-        # Rollback any failed transaction
+        # Rollback potentially partially committed changes (though less likely with separate commits)
         db_session.rollback()
         return jsonify({
             'success': False,
@@ -1287,19 +1306,40 @@ def api_voice_chat():
     personalization_context = personalization_engine.generate_personalization_context(user_id)
     
     # Generate AI response using LLM service
-    ai_response = get_llm_response(
+    # --- Updated to handle (text, audio) tuple --- 
+    ai_text_response, ai_audio_data = get_llm_response(
         user_message, 
-        session_id or 'api-session', 
+        session_id or 'api-session', # Use provided session_id or a default
         user_id, 
         personalization_context
     )
+    # --------------------------------------------
     
-    # In a real app, record this in the database
+    # In a real app, record this in the database (TherapyMessage)
+    # TODO: Decide if/how to link 'api-session' messages to users/sessions
+    # For now, we just return the response
     
-    return jsonify({
-        'success': True,
-        'response': ai_response
-    })
+    # --- Prepare JSON response including audio --- 
+    if ai_text_response:
+        audio_base64 = None
+        if ai_audio_data:
+            # Ensure base64 is imported (should be at top of file)
+            audio_base64 = b64encode(ai_audio_data).decode('utf-8')
+
+        return jsonify({
+            'success': True,
+            'response': ai_text_response,
+            'audio': audio_base64,
+            'audio_format': 'wav' # Assuming WAV format from llm_service
+        })
+    else:
+        # Handle case where LLM failed to generate text
+        logger.error(f"LLM failed to generate text response for API voice chat (session: {session_id or 'api-session'})")
+        return jsonify({
+            'success': False,
+            'message': 'AI failed to generate a response.'
+        }), 500 # Indicate server error
+    # --------------------------------------------
 
 # Error handlers
 @app.errorhandler(404)

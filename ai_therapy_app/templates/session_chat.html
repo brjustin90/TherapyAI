@@ -282,7 +282,7 @@
         // Handle form submission with fetch API instead of traditional form submit
         const chatForm = document.getElementById('chat-form');
         if (chatForm) {
-            chatForm.addEventListener('submit', function(e) {
+            chatForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
                 const messageInput = document.getElementById('message-input');
@@ -296,79 +296,92 @@
                 messageInput.value = '';
                 
                 // Add user message to chat
-                const userMessageDiv = document.createElement('div');
-                userMessageDiv.className = 'message user-message';
-                
-                const messageContent = document.createElement('p');
-                messageContent.textContent = message;
-                
-                const messageTime = document.createElement('span');
-                messageTime.className = 'message-time';
-                const now = new Date();
-                messageTime.textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                
-                userMessageDiv.appendChild(messageContent);
-                userMessageDiv.appendChild(messageTime);
-                chatMessages.appendChild(userMessageDiv);
-                
-                // Scroll to bottom
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                appendMessage(message, false);
                 
                 // Show typing indicator
                 typingIndicator.style.display = 'block';
-                chatMessages.scrollTop = chatMessages.scrollHeight;
                 
-                // Send message to server
-                fetch('/sessions/' + sessionId + '/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: message })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Hide typing indicator
-                    typingIndicator.style.display = 'none';
+                try {
+                    const response = await fetch(`/sessions/${sessionId}/chat`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded', // Using form submission
+                            'X-Requested-With': 'XMLHttpRequest' // Indicate AJAX
+                        },
+                        body: `message=${encodeURIComponent(message)}`
+                    });
                     
-                    if (data.response) {
-                        // Add AI response to chat
-                        const aiMessageDiv = document.createElement('div');
-                        aiMessageDiv.className = 'message ai-message';
-                        
-                        const aiContent = document.createElement('p');
-                        aiContent.textContent = data.response;
-                        
-                        const aiTime = document.createElement('span');
-                        aiTime.className = 'message-time';
-                        const responseTime = new Date();
-                        aiTime.textContent = responseTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        
-                        aiMessageDiv.appendChild(aiContent);
-                        aiMessageDiv.appendChild(aiTime);
-                        chatMessages.appendChild(aiMessageDiv);
-                        
-                        // Scroll to bottom
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    typingIndicator.style.display = 'none'; // Hide typing indicator
+                    
+                    if (!response.ok) {
+                        // Handle HTTP errors (like 500 Internal Server Error)
+                        let errorMsg = `Server error: ${response.status}`;
+                        try {
+                            // Try to get more specific error from backend JSON
+                            const errorData = await response.json();
+                            errorMsg = errorData.message || errorMsg;
+                        } catch (jsonError) { /* Ignore if response wasn't JSON */ }
+                        throw new Error(errorMsg);
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
                     
-                    // Hide typing indicator
-                    typingIndicator.style.display = 'none';
+                    const data = await response.json();
                     
-                    // Show error message
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'message system-message';
-                    errorDiv.textContent = 'Sorry, there was an error processing your message. Please try again.';
-                    chatMessages.appendChild(errorDiv);
+                    if (data.success && data.response) {
+                        // --- Use new appendMessage function --- 
+                        appendMessage(data.response, true, data.audio);
+                        // -------------------------------------
+                    } else {
+                        // Handle application-level errors reported by backend (success: false)
+                        throw new Error(data.message || 'Failed to get AI response.');
+                    }
                     
-                    // Scroll to bottom
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                });
+                } catch (error) {
+                    typingIndicator.style.display = 'none'; // Hide typing indicator on error too
+                    console.error('Error sending message:', error);
+                    appendSystemMessage(error.message || 'Error communicating with the server. Please try again.');
+                }
             });
         }
     });
+
+    // Function to append message to chat window
+    function appendMessage(content, isFromAI, audioData = null) {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message');
+        messageDiv.classList.add(isFromAI ? 'ai-message' : 'user-message');
+        
+        const textParagraph = document.createElement('p');
+        textParagraph.textContent = content;
+        messageDiv.appendChild(textParagraph);
+
+        // --- Add audio player if audioData is provided ---
+        if (isFromAI && audioData) {
+            try {
+                const audioPlayer = document.createElement('audio');
+                audioPlayer.controls = true;
+                audioPlayer.src = `data:audio/wav;base64,${audioData}`;
+                audioPlayer.style.marginTop = '0.5rem'; // Add some spacing
+                audioPlayer.style.maxWidth = '100%';  // Ensure it fits
+                messageDiv.appendChild(audioPlayer);
+            } catch (e) {
+                console.error("Error creating audio player:", e);
+                // Optionally append an error message about audio playback
+                const audioError = document.createElement('small');
+                audioError.textContent = "(Audio playback error)";
+                audioError.style.display = 'block';
+                audioError.style.color = 'red';
+                messageDiv.appendChild(audioError);
+            }
+        }
+        // ------------------------------------------------
+        
+        const timeSpan = document.createElement('span');
+        timeSpan.classList.add('message-time');
+        timeSpan.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        messageDiv.appendChild(timeSpan);
+        
+        chatMessages.appendChild(messageDiv);
+        scrollToBottom(); // Scroll after adding message
+    }
 </script>
 {% endblock %} 

@@ -9,10 +9,66 @@ from dotenv import load_dotenv
 import json
 import logging
 from datetime import datetime
+import io
+import torchaudio
+import base64
+import tempfile
+import random
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- TTS Integration ---
+try:
+    # Using pyttsx3 (cross-platform TTS that works on macOS)
+    import pyttsx3
+    import io
+    
+    # Initialize pyttsx3
+    tts_engine = pyttsx3.init()
+    # Set properties (optional)
+    tts_engine.setProperty('rate', 150)    # Slightly slower speed for therapeutic responses
+    tts_engine.setProperty('volume', 0.9)  # Volume (0.0 to 1.0)
+    
+    # Get available voices (optional, for customization)
+    voices = tts_engine.getProperty('voices')
+    # Select a voice - typically index 0 is system default
+    if voices:
+        # Use a female voice if available (often the second voice on macOS)
+        if len(voices) > 1:
+            tts_engine.setProperty('voice', voices[1].id)  # Usually a female voice on macOS
+        else:
+            tts_engine.setProperty('voice', voices[0].id)
+    
+    logger.info("pyttsx3 TTS engine initialized successfully.")
+    
+    # Function to convert text to speech audio bytes
+    def text_to_speech(text):
+        """Convert text to speech using pyttsx3 and return as WAV bytes."""
+        if not text:
+            return None
+        
+        # Create a temporary file for the audio
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+            # Save speech to the file
+            tts_engine.save_to_file(text, temp_file.name)
+            tts_engine.runAndWait()
+            
+            # Read the file back into memory
+            temp_file.close()  # Close to ensure all data is written
+            with open(temp_file.name, 'rb') as f:
+                audio_data = f.read()
+            
+            # Delete the temporary file
+            os.unlink(temp_file.name)
+            
+        return audio_data
+        
+except ImportError as e:
+    logger.error(f"Failed to initialize pyttsx3 TTS: {e}. TTS will not be available.")
+    text_to_speech = lambda text: None
+# --- TTS Integration END ---
 
 # Load environment variables
 load_dotenv()
@@ -51,6 +107,7 @@ MAX_HISTORY_LENGTH = 10
 def get_llm_response(user_message, session_id, user_id=None, personalization_context=None):
     """
     Get a response from the LLM based on the user's message and conversation history.
+    Now includes audio generation using pyttsx3.
     
     Args:
         user_message (str): The user's message
@@ -59,8 +116,12 @@ def get_llm_response(user_message, session_id, user_id=None, personalization_con
         personalization_context (dict, optional): Additional context for personalization
         
     Returns:
-        str: The AI therapist's response
+        (text_response, audio_data): A tuple containing the text response (str)
+                                     and the base64-encoded audio data (str or None).
     """
+    ai_text_response = None
+    ai_audio_data = None
+
     # Initialize session history if it doesn't exist
     if session_id not in message_history:
         message_history[session_id] = []
@@ -99,7 +160,9 @@ def get_llm_response(user_message, session_id, user_id=None, personalization_con
         if not api_key:
             # Demo mode - return a more sophisticated canned response
             logger.info("Using demo mode for LLM response")
-            return generate_demo_response(user_message, personalization_context)
+            demo_response = generate_demo_response(user_message, personalization_context)
+            # No audio in demo mode
+            return demo_response, None
         
         # Call OpenAI API
         response = openai.chat.completions.create(
@@ -121,73 +184,86 @@ def get_llm_response(user_message, session_id, user_id=None, personalization_con
             "content": ai_response
         })
         
-        return ai_response
+        ai_text_response = ai_response
+        
+        # Generate speech audio from the text (using pyttsx3)
+        try:
+            logger.info(f"Generating TTS audio for session {session_id}...")
+            audio_data = text_to_speech(ai_text_response)
+            # Convert to base64 for JSON transmission
+            if audio_data:
+                ai_audio_data = base64.b64encode(audio_data).decode('utf-8')
+                logger.info(f"Generated audio for response: {len(audio_data)} bytes")
+            else:
+                ai_audio_data = None
+                logger.warning("Failed to generate audio for response")
+        except Exception as e:
+            logger.error(f"Error generating speech: {e}")
+            ai_audio_data = None
+        
+        return ai_text_response, ai_audio_data
         
     except Exception as e:
         logger.error(f"Error getting LLM response: {str(e)}")
-        return "I'm having trouble connecting with my thoughts right now. Could you give me a moment, and perhaps rephrase what you were saying? I want to be fully present for our conversation."
+        # Return error text and None for audio
+        error_message = "I'm having trouble connecting with my thoughts right now. Could you give me a moment, and perhaps rephrase what you were saying? I want to be fully present for our conversation."
+        return error_message, None
 
 
 def generate_demo_response(user_message, personalization_context=None):
-    """
-    Generate a more sophisticated demo response when no API key is available.
-    Uses simple NLP techniques to create more contextual responses.
-    """
-    user_message = user_message.lower()
+    """Generate a demonstration response when no API key is available."""
     
-    # Extract potential topics/themes from the message
-    topics = []
-    if "anxious" in user_message or "anxiety" in user_message or "worried" in user_message:
-        topics.append("anxiety")
-    if "sad" in user_message or "depressed" in user_message or "unhappy" in user_message:
-        topics.append("depression")
-    if "relationship" in user_message or "partner" in user_message or "marriage" in user_message:
-        topics.append("relationships")
-    if "work" in user_message or "job" in user_message or "career" in user_message:
-        topics.append("work stress")
-    if "family" in user_message or "parent" in user_message or "child" in user_message:
-        topics.append("family issues")
-    if "sleep" in user_message or "tired" in user_message or "insomnia" in user_message:
-        topics.append("sleep problems")
+    # Generic supportive responses
+    generic_responses = [
+        "I understand how challenging that must be for you. Could you tell me more about how it affects your daily life?",
+        "It sounds like you're going through a lot right now. What coping strategies have helped you in the past?",
+        "Thank you for sharing that with me. How have you been managing these feelings so far?",
+        "That's a really important insight. How do you feel when you think about it that way?",
+        "I'm here to support you through this. What would be most helpful for you to focus on today?",
+        "I notice you mentioned feeling [emotion]. Could you tell me more about that?",
+        "It takes courage to talk about these things. What would be a small step you could take toward addressing this?",
+        "I'm curious about how this situation is affecting your relationships with others in your life.",
+        "Let's explore that further. What thoughts come up for you when you're in that situation?",
+        "That's a very common reaction, though I know it doesn't make it any easier. Have you considered trying mindfulness techniques?"
+    ]
     
-    # Default topic if none detected
-    if not topics:
-        topics.append("general wellbeing")
+    # Simple keyword matching for slightly more relevant responses
+    # Note: This is very basic and not a replacement for a real LLM!
+    anxiety_keywords = ["anxious", "anxiety", "worry", "panic", "stress", "afraid", "fear"]
+    depression_keywords = ["depressed", "depression", "sad", "hopeless", "empty", "tired", "exhausted"]
+    relationship_keywords = ["relationship", "partner", "marriage", "friend", "family", "parent", "child"]
+    work_keywords = ["job", "work", "career", "boss", "colleague", "workplace", "burnout"]
     
-    # Select appropriate response templates based on message content
-    if any(word in user_message for word in ["hello", "hi", "hey", "start"]):
-        return "Hello! I'm here to support you today. How are you feeling right now? What's been on your mind lately?"
+    message_lower = user_message.lower()
     
-    if "?" in user_message:
-        return f"That's a thoughtful question about {topics[0]}. I think it's important to explore this further. What specific aspects of this have been most challenging for you?"
+    # Check for keyword matches and return appropriate response
+    if any(keyword in message_lower for keyword in anxiety_keywords):
+        return "It sounds like anxiety might be playing a role here. Many people find breathing exercises helpful when anxiety arises. Would you like to explore some strategies that might help manage these feelings?"
     
-    if any(word in user_message for word in ["thank", "thanks"]):
-        return "You're very welcome. I'm here to support you. Is there anything else on your mind that you'd like to discuss today?"
+    elif any(keyword in message_lower for keyword in depression_keywords):
+        return "I'm hearing that you've been feeling low lately. Depression can make even small tasks feel overwhelming. What's one small thing you might be able to do today that could bring you a moment of peace or satisfaction?"
     
-    if any(word in user_message for word in ["bad", "terrible", "awful", "worst"]):
-        return f"I'm sorry to hear you're going through such a difficult time with {topics[0]}. That sounds really challenging. Could you tell me more about how this is affecting you day to day?"
+    elif any(keyword in message_lower for keyword in relationship_keywords):
+        return "Relationships can be both deeply fulfilling and challenging. It seems this situation is having a significant impact on you. Could you tell me more about what patterns you've noticed in this relationship?"
     
-    if any(word in user_message for word in ["good", "great", "happy", "better"]):
-        return f"I'm glad to hear there are some positive aspects to your experience with {topics[0]}. What do you think has contributed to these positive feelings?"
+    elif any(keyword in message_lower for keyword in work_keywords):
+        return "Work-related stress can affect many areas of our lives. Finding a healthy work-life balance is important. What boundaries might you be able to set to create more space for yourself?"
     
-    if len(user_message) < 20:
-        return f"I notice your response was brief. Could you tell me more about your experience with {topics[0]}? I'm here to listen and understand what you're going through."
-    
-    # Default responses based on detected topics
-    if "anxiety" in topics:
-        return "I can hear that anxiety is playing a significant role in your experience. When you feel this anxiety, where do you notice it in your body? And have you found any strategies that help you manage these feelings, even if just temporarily?"
-    
-    if "depression" in topics:
-        return "It sounds like you've been experiencing some difficult emotions lately. Depression can make everything feel more challenging. What small activities have you found that give you even momentary relief or connection?"
-    
-    if "relationships" in topics:
-        return "Relationships can be both deeply fulfilling and challenging. I'm hearing that this particular relationship has been on your mind. What aspects of this relationship are most important to you? And what changes would you like to see?"
-    
-    if "work stress" in topics:
-        return "Work-related stress can have a significant impact on our overall wellbeing. What aspects of your work situation feel most overwhelming right now? And are there any small boundaries you could set to create more space for yourself?"
-    
-    # General therapeutic response
-    return f"Thank you for sharing that with me. I'm hearing that {topics[0]} has been significant for you lately. Could you tell me more about how this has been affecting you emotionally? What feelings come up when you think about this?"
+    # If no keywords match, return a random generic response
+    else:
+        # If personalization context is available, insert name for a more personal touch
+        selected_response = random.choice(generic_responses)
+        if personalization_context and "name" in personalization_context:
+            # Replace "you" with name occasionally to personalize
+            if "you" in selected_response and random.random() > 0.5:
+                selected_response = selected_response.replace("you", personalization_context["name"], 1)
+        
+        # Sometimes add a prompt for the emotion
+        if "I notice you mentioned feeling [emotion]" in selected_response:
+            emotions = ["frustrated", "worried", "confused", "overwhelmed", "hopeful", "conflicted"]
+            selected_response = selected_response.replace("[emotion]", random.choice(emotions))
+            
+        return selected_response
 
 
 def clear_session_history(session_id):
